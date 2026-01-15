@@ -3,61 +3,396 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Avatar Face Tracking</title>
+  <meta name="description" content="Real-time 2D-to-3D avatar with face and gesture tracking">
+  <title>2D-to-3D Avatar | Real-Time Face Tracking</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="preconnect" href="https://storage.googleapis.com">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: system-ui, -apple-system, sans-serif; overflow: hidden; background: #1a1a2e; }
-    #app { width: 100vw; height: 100vh; }
-    #canvas { width: 100%; height: 100%; display: block; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+      background: #0f0f1e;
+      color: white;
+    }
+
+    #app {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+    }
+
+    /* Video Feed */
     #video-feed {
       position: fixed;
       bottom: 20px;
       right: 20px;
       width: 240px;
       height: 180px;
-      border: 3px solid rgba(255,255,255,0.3);
-      border-radius: 12px;
+      border: 3px solid rgba(136, 204, 255, 0.4);
+      border-radius: 16px;
       overflow: hidden;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+      z-index: 10;
     }
+
+    #video-feed:hover {
+      border-color: rgba(136, 204, 255, 0.8);
+      box-shadow: 0 12px 48px rgba(0,0,0,0.8);
+    }
+
     #video-feed video {
       width: 100%;
       height: 100%;
       object-fit: cover;
       transform: scaleX(-1);
     }
+
+    /* Loading Screen */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      transition: opacity 0.5s ease;
+    }
+
+    .loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-content {
+      text-align: center;
+    }
+
+    .loading-title {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      background: linear-gradient(90deg, #88ccff, #ff6b9d);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .loading-bar {
+      width: 300px;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 20px auto;
+    }
+
+    .loading-progress {
+      height: 100%;
+      background: linear-gradient(90deg, #88ccff, #ff6b9d);
+      width: 0%;
+      transition: width 0.3s ease;
+      border-radius: 3px;
+    }
+
+    .loading-status {
+      font-size: 14px;
+      color: rgba(255,255,255,0.6);
+      margin-top: 10px;
+    }
+
+    /* Status Badge */
     #status {
       position: fixed;
       top: 20px;
       left: 20px;
       padding: 12px 20px;
-      background: rgba(0,0,0,0.8);
+      background: rgba(30, 30, 50, 0.9);
+      backdrop-filter: blur(10px);
       color: white;
-      border-radius: 8px;
+      border-radius: 12px;
       font-size: 14px;
+      font-weight: 500;
       z-index: 100;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      transition: all 0.3s ease;
     }
-    #status.active { background: rgba(34,197,94,0.9); }
-    .loading {
+
+    #status.active {
+      background: rgba(34, 197, 94, 0.9);
+      border-color: rgba(34, 197, 94, 0.5);
+    }
+
+    /* Performance Stats Panel */
+    #stats-panel {
       position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
       color: white;
-      font-size: 20px;
-      text-align: center;
+      z-index: 100;
+      min-width: 200px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      transition: all 0.3s ease;
+    }
+
+    #stats-panel.hidden {
+      display: none;
+    }
+
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+
+    .stats-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .stats-label {
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .stats-value {
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .stats-value.good { color: #22c55e; }
+    .stats-value.medium { color: #eab308; }
+    .stats-value.bad { color: #ef4444; }
+
+    /* Control Panel */
+    #control-panel {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(26, 26, 46, 0.95);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 20px;
+      z-index: 100;
+      min-width: 220px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+
+    .control-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: white;
+    }
+
+    .control-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      padding: 8px 0;
+    }
+
+    .control-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .control-label {
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.9);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Toggle Switch */
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .toggle-switch.active {
+      background: #22c55e;
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.3s ease;
+    }
+
+    .toggle-switch.active::after {
+      transform: translateX(20px);
+    }
+
+    /* Gesture Notification */
+    #gesture-notification {
+      position: fixed;
+      top: -100px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(34, 197, 94, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 500;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      z-index: 200;
+      transition: top 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+      white-space: nowrap;
+    }
+
+    #gesture-notification.show {
+      top: 20px;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      #video-feed {
+        width: 160px;
+        height: 120px;
+        bottom: 10px;
+        right: 10px;
+      }
+
+      #control-panel {
+        top: 10px;
+        right: 10px;
+        padding: 16px;
+        min-width: 180px;
+        font-size: 13px;
+      }
+
+      #stats-panel {
+        bottom: 10px;
+        left: 10px;
+        padding: 12px;
+        font-size: 12px;
+      }
+
+      .loading-title {
+        font-size: 24px;
+      }
+
+      .loading-bar {
+        width: 240px;
+      }
+
+      #gesture-notification {
+        font-size: 14px;
+        padding: 10px 20px;
+      }
     }
   </style>
 </head>
 <body>
   <div id="app">
+    <!-- Main Canvas -->
     <canvas id="canvas"></canvas>
+
+    <!-- Video Feed -->
     <div id="video-feed" style="display:none;">
       <video id="webcam" autoplay playsinline muted></video>
     </div>
+
+    <!-- Status Badge -->
     <div id="status">Initializing...</div>
-    <div class="loading" id="loading">Loading...</div>
+
+    <!-- Performance Stats Panel -->
+    <div id="stats-panel">
+      <div class="stats-row">
+        <span class="stats-label">FPS:</span>
+        <span class="stats-value" id="fps-value">--</span>
+      </div>
+      <div class="stats-row">
+        <span class="stats-label">Latency:</span>
+        <span class="stats-value" id="latency-value">--</span>
+      </div>
+      <div class="stats-row">
+        <span class="stats-label">Face:</span>
+        <span class="stats-value" id="face-status">--</span>
+      </div>
+      <div class="stats-row">
+        <span class="stats-label">Hands:</span>
+        <span class="stats-value" id="hands-count">0</span>
+      </div>
+    </div>
+
+    <!-- Control Panel -->
+    <div id="control-panel">
+      <div class="control-title">Controls</div>
+      <div class="control-item">
+        <span class="control-label">📊 Stats Panel</span>
+        <div class="toggle-switch active" id="stats-toggle"></div>
+      </div>
+      <div class="control-item">
+        <span class="control-label">🎯 Debug Mode</span>
+        <div class="toggle-switch" id="debug-toggle"></div>
+      </div>
+      <div class="control-item">
+        <span class="control-label">✨ Particles</span>
+        <div class="toggle-switch active" id="particles-toggle"></div>
+      </div>
+      <div class="control-item">
+        <span class="control-label">🌊 Background FX</span>
+        <div class="toggle-switch active" id="background-toggle"></div>
+      </div>
+    </div>
+
+    <!-- Gesture Notification -->
+    <div id="gesture-notification"></div>
+
+    <!-- Loading Screen -->
+    <div class="loading-overlay" id="loading">
+      <div class="loading-content">
+        <div class="loading-title">2D-to-3D Avatar</div>
+        <div class="loading-bar">
+          <div class="loading-progress" id="loading-progress"></div>
+        </div>
+        <div class="loading-status" id="loading-status">Initializing...</div>
+      </div>
+    </div>
   </div>
+
   <script type="module" src="/main.js"></script>
 </body>
 </html>
