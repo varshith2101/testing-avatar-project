@@ -35,50 +35,6 @@ npm run build
 npm preview
 ```
 
-## Deployment
-
-### Option 1: Vercel (Recommended)
-
-1. Push your code to GitHub
-2. Go to [vercel.com](https://vercel.com)
-3. Click "Import Project"
-4. Select your GitHub repository
-5. Vercel will auto-detect Vite and deploy
-
-Or use Vercel CLI:
-```bash
-npm install -g vercel
-vercel
-```
-
-### Option 2: Netlify
-
-1. Push your code to GitHub
-2. Go to [netlify.com](https://netlify.com)
-3. Click "Add new site" → "Import an existing project"
-4. Select your GitHub repository
-5. Build command: `npm run build`
-6. Publish directory: `dist`
-
-Or use Netlify CLI:
-```bash
-npm install -g netlify-cli
-netlify deploy --prod
-```
-
-### Option 3: GitHub Pages
-
-```bash
-# Install gh-pages
-npm install -D gh-pages
-
-# Add to package.json scripts:
-# "deploy": "npm run build && gh-pages -d dist"
-
-# Deploy
-npm run deploy
-```
-
 ## Camera Permissions
 
 The app requires camera access. Make sure to:
